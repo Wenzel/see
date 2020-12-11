@@ -205,7 +205,7 @@ def domain_create(hypervisor, identifier, configuration, disk_path, network_name
     return hypervisor.defineXML(xml)
 
 
-def domain_delete(domain, logger):
+def domain_delete(uri, domain, logger):
     """libvirt domain undefinition.
 
     @raise: libvirt.libvirtError.
@@ -216,8 +216,12 @@ def domain_delete(domain, logger):
             domain.destroy()
     except libvirt.libvirtError:
         logger.exception("Unable to destroy the domain.")
+    flags = libvirt.VIR_DOMAIN_UNDEFINE_SNAPSHOTS_METADATA
+    if uri.startswith('xen:///'):
+        # libvirt xen driver doesn't support snapshots
+        flags = 0
     try:
-        domain.undefineFlags(libvirt.VIR_DOMAIN_UNDEFINE_SNAPSHOTS_METADATA)
+        domain.undefineFlags(flags)
     except libvirt.libvirtError:
         logger.exception("Unable to undefine the domain.")
 
@@ -386,7 +390,7 @@ class QEMUResources(resources.Resources):
     def deallocate(self):
         """Releases all resources."""
         if self._domain is not None:
-            domain_delete(self._domain, self.logger)
+            domain_delete(self._hypervisor.getURI(), self._domain, self.logger)
         if self._network is not None:
             self._network_delete()
         if self._storage_pool is not None:
